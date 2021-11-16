@@ -78,7 +78,7 @@ resources:
             ForwardedValues:
               QueryString: true
               Cookies:
-                Forward: none
+                Forward: all
           Enabled: true
           Origins:
             - Id: ${self:service}-${self:provider.stage}-Origin
