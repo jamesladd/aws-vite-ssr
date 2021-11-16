@@ -1,0 +1,121 @@
+service: aws-vite-ssr
+
+frameworkVersion: '2'
+
+plugins:
+  - serverless-domain-manager
+  - serverless-api-gateway-caching
+
+provider:
+  name: aws
+  runtime: nodejs14.x
+  stage: ${opt:stage, 'dev'}
+  region: ${opt:region, 'us-east-1'}
+  versionFunctions: false
+  lambdaHashingVersion: 20201221
+  apiGateway:
+    shouldStartNameWithService: true
+  environment: ${file(env.yml):${self:provider.stage}}
+
+package:
+  exclude:
+    - static/**
+
+custom:
+  env: ${self:provider.environment}
+  customDomain:
+    domainName: ${self:custom.env.APP_DOMAIN}
+    certificateName: ${self:custom.env.APP_CERTIFICATE_NAME}
+    createRoute53Record: true
+    endpointType: 'regional'
+    securityPolicy: tls_1_2
+    apiType: rest
+    autoDomain: true
+    enabled: true
+
+functions:
+  ssr:
+    handler: server/ssr.handler
+    reservedConcurrency: 4
+    timeout: 30
+    role: SsrRoleV1
+    events:
+      - http:
+          path: /
+          method: any
+          caching:
+            enabled: false
+      - http:
+          path: /{proxy+}
+          method: any
+          caching:
+            enabled: false
+
+resources:
+  Resources:
+
+    SsrDistribution:
+      Type: AWS::CloudFront::Distribution
+      Properties:
+        DistributionConfig:
+          Comment: ${self:provider.stage} ${self:service}
+          DefaultCacheBehavior:
+            TargetOriginId: ${self:service}-${self:provider.stage}-Origin
+            ViewerProtocolPolicy: 'redirect-to-https'
+            DefaultTTL: 30
+            AllowedMethods:
+              - 'GET'
+              - 'HEAD'
+              - 'OPTIONS'
+              - 'PUT'
+              - 'PATCH'
+              - 'POST'
+              - 'DELETE'
+            CachedMethods:
+              - 'HEAD'
+              - 'GET'
+              - 'OPTIONS'
+            ForwardedValues:
+              QueryString: true
+              Cookies:
+                Forward: none
+          Enabled: true
+          Origins:
+            - Id: ${self:service}-${self:provider.stage}-Origin
+              DomainName:
+                Fn::Join:
+                  - ""
+                  - - "Ref": "ApiGatewayRestApi"
+                    - ".execute-api.${self:provider.region}.amazonaws.com"
+              OriginPath: /dev
+              CustomOriginConfig:
+                HTTPPort: 80
+                HTTPSPort: 443
+                OriginProtocolPolicy: https-only
+
+    SsrRoleV1:
+      Type: AWS::IAM::Role
+      Properties:
+        RoleName: ${self:service}-${self:provider.stage}-SsrRoleV1
+        AssumeRolePolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service:
+                  - lambda.amazonaws.com
+              Action: sts:AssumeRole
+            - Effect: Allow
+              Principal:
+                Service:
+                  - edgelambda.amazonaws.com
+              Action: sts:AssumeRole
+        Policies:
+          - PolicyName: ${self:service}-${self:provider.stage}-SsrPolicyV1
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                - Effect: "Allow"
+                  Action:
+                    - logs:*
+                  Resource: "*"
