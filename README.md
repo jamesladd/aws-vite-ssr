@@ -76,3 +76,11 @@ Click 'Save'
 Do both the 'A' and 'AAAA' records.
 
 Now if you open your browser and goto your domain name your CACHED Ssr application should be shown.
+
+#### Gotchas
+
+If the Cloudfront served version has an error getting your app then check the Distribution Security Policy version.
+
+This must match the version in your certificate.
+
+For example, while TLSv1.2_2021 is recommended if your certificate is older it will need to be changed. For me this was TLSv1.2_2019

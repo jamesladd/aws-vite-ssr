@@ -54,6 +54,26 @@ functions:
 resources:
   Resources:
 
+    SsrCachePolicy:
+      Type: 'AWS::CloudFront::CachePolicy'
+      Properties:
+        CachePolicyConfig:
+          DefaultTTL: 86400
+          MaxTTL: 31536000
+          MinTTL: 1
+          Name: ${self:service}-${self:provider.stage}-cf-policy
+          ParametersInCacheKeyAndForwardedToOrigin:
+            CookiesConfig:
+              CookieBehavior: 'all'
+            EnableAcceptEncodingBrotli: true
+            EnableAcceptEncodingGzip: true
+            HeadersConfig:
+              HeaderBehavior: 'none'
+            #              Headers:
+            #                - Host
+            QueryStringsConfig:
+              QueryStringBehavior: 'all'
+
     SsrDistribution:
       Type: AWS::CloudFront::Distribution
       Properties:
@@ -62,6 +82,7 @@ resources:
           DefaultCacheBehavior:
             TargetOriginId: ${self:service}-${self:provider.stage}-Origin
             ViewerProtocolPolicy: 'redirect-to-https'
+            CachePolicyId: !Ref SsrCachePolicy
             DefaultTTL: 30
             AllowedMethods:
               - 'GET'
@@ -75,10 +96,6 @@ resources:
               - 'HEAD'
               - 'GET'
               - 'OPTIONS'
-            ForwardedValues:
-              QueryString: true
-              Cookies:
-                Forward: all
           Enabled: true
           Origins:
             - Id: ${self:service}-${self:provider.stage}-Origin
